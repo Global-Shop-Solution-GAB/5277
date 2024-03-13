@@ -1,0 +1,103 @@
+Program.Sub.ScreenSU.Start
+Gui.frmPartVerify..Create
+Gui.frmPartVerify..Caption("Part Verification")
+Gui.frmPartVerify..Size(4965,2955)
+Gui.frmPartVerify..MinX(0)
+Gui.frmPartVerify..MinY(0)
+Gui.frmPartVerify..Position(0,0)
+Gui.frmPartVerify..BackColor(-2147483633)
+Gui.frmPartVerify..MousePointer(0)
+Gui.frmPartVerify..Event(UnLoad,frmPartVerify_UnLoad)
+Gui.frmPartVerify.optVerifyAll.Create(Option)
+Gui.frmPartVerify.optVerifyAll.Size(2175,255)
+Gui.frmPartVerify.optVerifyAll.Position(240,705)
+Gui.frmPartVerify.optVerifyAll.Caption("Verify All Parts")
+Gui.frmPartVerify.optVerifyNew.Create(Option)
+Gui.frmPartVerify.optVerifyNew.Size(3255,330)
+Gui.frmPartVerify.optVerifyNew.Position(240,255)
+Gui.frmPartVerify.optVerifyNew.Caption("Verify New Parts Only")
+Gui.frmPartVerify.cmdProcess.Create(Button)
+Gui.frmPartVerify.cmdProcess.Size(1290,375)
+Gui.frmPartVerify.cmdProcess.Position(210,1275)
+Gui.frmPartVerify.cmdProcess.Caption("Process")
+Gui.frmPartVerify.cmdProcess.Event(Click,cmdProcess_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.If(v.Caller.Hook,=,"11210")
+	v.Passed.000201.Set("Create Parts")
+f.Intrinsic.Control.Else
+	F.ODBC.Connection!CON.OPENCONNECTION(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+	gui.frmPartVerify.optVerifyNew.Value(true)
+	GUI.frmPartVerify..Show
+f.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.frmPartVerify_UnLoad.Start
+F.ODBC.Connection!CON.Close
+F.Intrinsic.Control.End
+Program.Sub.frmPartVerify_UnLoad.End
+
+Program.Sub.cmdProcess_Click.Start
+V.Local.iRowCnt.Declare(long)
+v.Local.j.Declare(long)
+v.Local.sReadRow.Declare(string)
+v.Local.sTemp.Declare(string)
+v.Local.sRet.Declare(string)
+v.Local.sSearch.Declare(string)
+v.Local.sDisplayPart.Declare(string)
+v.Local.sDisplayRev.Declare(string)
+v.Local.sShortRet.Declare(string)
+v.Local.sSeq.Declare(string)
+v.Local.sLMO.Declare(string)
+v.Local.sDesc.Declare(string)
+v.Local.sUM.Declare(string)
+v.Local.sLoc.Declare(string)
+v.Local.sParams.Declare(string)
+v.Local.sSql.Declare(string)
+v.Local.bVerifyNew.Declare(boolean)
+v.Local.bVerifyNew.Set(v.Screen.frmPartVerify!optVerifyNew.value)
+v.Local.bVerifyAll.Declare(Boolean)
+v.Local.bVerifyAll.Set(v.Screen.frmPartVerify!optVerifyAll.value)
+
+F.Intrinsic.BDF.Load("AUX001","AUX001")
+F.Intrinsic.BDF.Clone("AUX001","Clone")
+F.Intrinsic.BDF.ReadRowCount("AUX001",V.Local.iRowCnt)
+F.Intrinsic.Math.Sub(V.Local.iRowCnt,1,V.Local.iRowCnt)
+F.Intrinsic.Control.For(V.Local.j,0,V.Local.iRowCnt,1)
+	F.Intrinsic.BDF.ReadRow("AUX001",V.Local.j,V.Local.sReadRow)
+	F.Intrinsic.String.Split(V.Local.sReadRow,"|~|",V.Local.sTemp)
+	v.Local.sLMO.Set(v.Local.sTemp(1))
+	f.Intrinsic.Control.If(v.Local.sLMO.Trim,=,"M")
+		'Set Variables
+		v.Local.sDisplayPart.Set(v.Local.sTemp(3))
+		v.Local.sDisplayRev.Set(v.Local.sTemp(4))
+		v.Local.sUM.Set(V.Local.sTemp(7))
+		V.Local.sDesc.Set(v.Local.sTemp(9))
+		'Get the long part number
+		F.Global.Inventory.GetGSSPart(V.Local.sDisplayPart.Trim,V.Local.sDisplayRev.Trim,V.Local.sShortRet)
+		'Check if long part number exists in inventory
+		f.Intrinsic.String.Build("SELECT * FROM V_INVENTORY_MSTR WHERE PART='{0}'",v.Local.sShortRet,v.Local.sSql)
+		F.ODBC.Connection!CON.EXECUTEANDRETURN(v.Local.sSql,v.Local.sRet)
+		f.Intrinsic.Control.If(v.Local.bVerifyNew)
+			f.Intrinsic.Control.If(v.Local.sRet.Trim,=,"")
+				f.Intrinsic.Control.CallSub(launchPart,"sShortRet",v.Local.sShortRet,"sUM",v.Local.sUM,"sDesc",v.Local.sDesc,"sLoc",v.Local.sLoc)
+			f.Intrinsic.Control.EndIf
+		f.Intrinsic.Control.ElseIf(v.Local.bVerifyAll)
+			f.Intrinsic.Control.CallSub(launchPart,"sShortRet",v.Local.sShortRet,"sUM",v.Local.sUM,"sDesc",v.Local.sDesc,"sLoc",v.Local.sLoc)
+		f.Intrinsic.control.EndIf
+	F.Intrinsic.Control.EndIf
+f.Intrinsic.Control.Next(v.Local.j)
+F.Intrinsic.Control.CallSub(frmPartVerify_UnLoad)
+Program.Sub.cmdProcess_Click.End
+
+Program.Sub.launchPart.Start
+v.Local.sParams.Declare(string)
+f.Global.Inventory.CreatePart(v.args.sShortRet,v.args.sUM,v.args.sDesc,v.args.sLoc,"","","","","")
+F.Intrinsic.String.ConcatCallWrapperArgs("O","D",v.args.sShortRet,v.Local.sParams)
+F.Intrinsic.String.Concat(V.Caller.CompanyCode,"!*!","O","!*!","!*!","!*!",v.args.sShortRet.UCase,"!*!","",V.Local.sParams)
+F.Global.General.CallWrappersync(3500,V.Local.sParams)
+Program.Sub.launchPart.End
